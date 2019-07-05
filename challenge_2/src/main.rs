@@ -1,4 +1,4 @@
-use openssl::symm::{decrypt, encrypt, Cipher};
+use openssl::symm::{decrypt, encrypt, Cipher, Crypter, Mode};
 use std::fs::File;
 use std::io::{BufReader, Read};
 
@@ -15,21 +15,61 @@ fn main() {
     let mut encrypted_base_64 = String::new();
     buf.read_to_string(&mut encrypted_base_64).unwrap();
 
-    let encrypted_hex = base_64_to_hex(&encrypted_base_64);
     let key = "YELLOW SUBMARINE";
 
-    // println!(
-    //     "{}",
-    //     bytes_to_string(&decrypt_aes_128_cbc(&hex_to_bytes(&encrypted_hex), key))
-    // );
-    let first = vec![
-        10, 253, 11, 22, 182, 39, 209, 151, 17, 93, 228, 24, 56, 153, 87, 221, 62, 60, 32, 210, 84,
-        102, 56, 86, 1, 124, 203, 177, 158, 116, 141, 97,
-    ];
-    println!(
-        "{}",
-        bytes_to_hex_string(&decrypt_aes_128_ecb(&first, key.as_bytes()))
+    let encrypted_hex = hex_to_bytes(&base_64_to_hex(&encrypted_base_64));
+    let encrypted_block = encrypted_hex[0..16].to_owned();
+    let encrypted_block_2 = encrypted_hex[16..32].to_owned();
+    println!("{:?}", encrypted_block);
+    println!("{:?}", encrypted_block_2);
+    let iv: Vec<u8> = (1..16).map(|_| 0).collect();
+
+    let decrypted = decrypt_one_block_aes_128_ecb(&encrypted_block, key.as_bytes());
+    let decrypted_2 = xor(
+        &decrypt_one_block_aes_128_ecb(&encrypted_block_2, key.as_bytes()),
+        &encrypted_block,
     );
+
+    println!("Decrypted: {:?}", bytes_to_string(&decrypted));
+    println!("Decrypted: {:?}", bytes_to_string(&decrypted_2));
+
+    let encrypted = encrypt_aes_128_ecb(&decrypted, key);
+    let encrypted_2 = encrypt_aes_128_ecb(&xor(&encrypted, &decrypted_2), key);
+
+    println!("Encrypted Again: \t{:?}", encrypted);
+    println!("Encrypted Again: \t{:?}", encrypted_2);
+
+    let tailing_junk = vec![
+        96, 250, 54, 112, 126, 69, 244, 153, 219, 160, 242, 91, 146, 35,
+    ];
+
+    let encrypted_2 = encrypt_aes_128_ecb(&[0x00; 16], key);
+    println!("maybe tailing junk: \t{:?}", encrypted_2);
+
+    println!("{:?}", &tailing_junk);
+
+    // println!(
+    //     "Decrypted (mine): {:?}",
+    //     decrypt_aes_128_ecb(&encrypted, key.as_bytes())
+    // );
+    // println!(
+    //     "Decrypted (bernies): {:?}",
+    //     decrypt_data(&encrypted, key.as_bytes())
+    // );
+}
+
+pub fn decrypt_one_block_aes_128_ecb(data: &[u8], key: &[u8]) -> Vec<u8> {
+    let cipher = Cipher::aes_128_ecb();
+
+    let mut decrypted = Crypter::new(cipher, Mode::Decrypt, key, None).unwrap();
+    let mut output = vec![0 as u8; data.len() + Cipher::aes_128_cbc().block_size()];
+
+    let decrypted_result = decrypted.update(&data, &mut output);
+
+    match decrypted_result {
+        Ok(_) => output[0..16].to_owned(),
+        Err(e) => panic!("Error decrypting text: {}", e),
+    }
 }
 
 pub fn hex_to_bytes(hex: &str) -> Vec<u8> {
@@ -77,6 +117,21 @@ fn pad_with_x04(s: &[u8], len: u32) -> Vec<u8> {
         padded.push('\x04' as u8);
     }
     padded
+}
+
+pub fn hex_to_base_64(s: &str) -> String {
+    let mut b64 = String::new();
+    let mut bins: Vec<u8> = Vec::new();
+
+    for byte in hex_to_bytes(s) {
+        bins.append(&mut byte_to_binary(byte, 8));
+    }
+
+    for c in bins.chunks(6) {
+        b64.push(BASE_64_ALPHABET[binary_to_byte(c) as usize]);
+    }
+
+    b64
 }
 
 pub fn hex_to_byte(hex: &[u8]) -> u8 {
@@ -137,10 +192,16 @@ pub fn decrypt_aes_128_ecb(encrypted: &[u8], key: &[u8]) -> Vec<u8> {
     decrypt(cipher, key, None, encrypted).unwrap()
 }
 
-pub fn encrypt_aes_128_ecb(decrypted: &[u8], key: &[u8]) -> Vec<u8> {
+pub fn encrypt_one_block_aes_128_ecb(decrypted: &[u8], key: &str) -> Vec<u8> {
     let cipher = Cipher::aes_128_ecb();
 
-    encrypt(cipher, key, None, decrypted).unwrap()
+    encrypt(cipher, key.as_bytes(), None, decrypted).unwrap()[0..16].to_owned()
+}
+
+pub fn encrypt_aes_128_ecb(decrypted: &[u8], key: &str) -> Vec<u8> {
+    let cipher = Cipher::aes_128_ecb();
+
+    encrypt(cipher, key.as_bytes(), None, decrypted).unwrap()
 }
 
 pub fn encrypt_aes_128_cbc(plaintext: &str, key: &str) -> Vec<u8> {
@@ -149,18 +210,15 @@ pub fn encrypt_aes_128_cbc(plaintext: &str, key: &str) -> Vec<u8> {
     let mut encrypted: Vec<u8> = Vec::new();
     let mut previous_ciphertext_block: Vec<u8> = (0..block_size).map(|_| 0).collect();
     for block in blocks {
-        // println!("UNENCRYPTED:\t{:?}", block);
         let xored = &xor(
             &pad_with_x04(&block, block_size as u32),
             &previous_ciphertext_block,
         );
-        // println!("COMBINED:\t{:?}", xored);
-        let mut text = [0; 32];
-        encrypt_aes_128_ecb(xored, key.as_bytes())
-            .take(block_size as u64 * 2)
+        let mut text = [0; 16];
+        encrypt_aes_128_ecb(xored, key)
+            .take(block_size as u64)
             .read_exact(&mut text)
             .unwrap();
-        // println!("ENCRYPTED:\t{:?}", &text[..]);
         previous_ciphertext_block = text.to_vec();
         encrypted.append(&mut text.to_vec());
     }
@@ -168,26 +226,17 @@ pub fn encrypt_aes_128_cbc(plaintext: &str, key: &str) -> Vec<u8> {
 }
 
 pub fn decrypt_aes_128_cbc(encrypted: &[u8], key: &str) -> Vec<u8> {
-    println!("=======================DECRYPTING=====================");
     let block_size = 16;
     let mut plain: Vec<u8> = Vec::new();
 
-    let blocks: Vec<&[u8]> = encrypted.chunks(block_size * 2).rev().collect();
+    let blocks: Vec<&[u8]> = encrypted.chunks(block_size).rev().collect();
     for (i, block) in blocks.clone().iter().enumerate() {
         let previous_cyphertext = match blocks.get(i + 1) {
             Some(x) => x,
-            None => &[0 as u8; 32][..],
+            None => &[0 as u8; 16][..],
         };
-        println!("ENCRYPTED:\t{:?}\t({} bytes long)", block, block.len());
-        // println!(
-        //     "PREVIOUS CYPHERTEXT:\t{:?}\t({} bytes long)",
-        //     previous_cyphertext,
-        //     previous_cyphertext.len()
-        // );
-        let decrypted_block = decrypt_aes_128_ecb(&block, key.as_bytes());
-        println!("COMBINED:\t{:?}", decrypted_block);
+        let decrypted_block = decrypt_one_block_aes_128_ecb(&block, key.as_bytes());
         let plain_block = xor(&decrypted_block, previous_cyphertext);
-        println!("UNENCRYPTED:\t{:?}", plain_block);
         plain.splice(0..0, plain_block.iter().cloned());
     }
     plain
@@ -245,18 +294,20 @@ mod test {
         let key = "YELLOW SUBMARINE";
 
         assert_eq!(
-            bytes_to_hex_string(&encrypt_aes_128_ecb(decrypted.as_bytes(), key.as_bytes())),
+            bytes_to_hex_string(&encrypt_aes_128_ecb(decrypted.as_bytes(), key)),
             encrypted,
         );
     }
 
     #[test]
     fn test_encrypt_aes_cbc() {
-        let file = File::open("7.txt").unwrap();
-        let mut buf_reader = BufReader::new(file);
-        let mut encrypted_base_64 = String::new();
-        buf_reader.read_to_string(&mut encrypted_base_64).unwrap();
-        let ecb_encrypted = hex_to_bytes(&base_64_to_hex(&encrypted_base_64));
+        let cbc_encrypted = File::open("10.txt").unwrap();
+        let mut buf_reader = BufReader::new(cbc_encrypted);
+        let mut cbc_encrypted_base_64 = String::new();
+        buf_reader
+            .read_to_string(&mut cbc_encrypted_base_64)
+            .unwrap();
+        let cbc_encrypted = hex_to_bytes(&base_64_to_hex(&cbc_encrypted_base_64));
 
         let decrypted_file = File::open("7_decrypted.txt").unwrap();
         let mut decrypted_buf_reader = BufReader::new(decrypted_file);
@@ -267,14 +318,20 @@ mod test {
 
         let encrypted = encrypt_aes_128_cbc(&decrypted, key);
 
+        assert_eq!(
+            bytes_to_hex_string(&cbc_encrypted),
+            bytes_to_hex_string(&encrypted)
+        );
+
         let candidate_decrypted = decrypt_aes_128_cbc(&encrypted, key);
 
         assert_eq!(
-            bytes_to_string(&candidate_decrypted),
-            bytes_to_string(&pad_with_x04(
+            bytes_to_hex_string(&candidate_decrypted),
+            bytes_to_hex_string(&pad_with_x04(
                 decrypted.as_bytes(),
                 candidate_decrypted.len() as u32
             ))
         );
     }
+
 }
