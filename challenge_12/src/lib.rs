@@ -68,6 +68,7 @@ pub fn oracle(input: &[u8], key: &[u8]) -> Vec<u8> {
     let mut unknown_bytes = hex_to_bytes(&base_64_to_hex(
         &fs::read_to_string("unknown_string.txt").expect("Unable to read file"),
     ));
-    input.to_vec().append(&mut unknown_bytes);
-    encrypt_aes_128_ecb(input, &bytes_to_string(&key))
+    let mut to_encrypt = input.to_vec();
+    to_encrypt.append(&mut unknown_bytes);
+    encrypt_aes_128_ecb(&to_encrypt, &bytes_to_string(&key))
 }
