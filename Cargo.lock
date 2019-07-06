@@ -55,6 +55,12 @@ dependencies = [
 [[package]]
 name = "challenge_13"
 version = "0.1.0"
+dependencies = [
+ "challenge_10 0.1.0",
+ "challenge_11 0.1.0",
+ "challenge_12 0.1.0",
+ "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "cloudabi"

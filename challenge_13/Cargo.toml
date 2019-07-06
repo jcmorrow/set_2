@@ -5,3 +5,7 @@ authors = ["Josh Morrow <josh@jcmorrow.com>"]
 edition = "2018"
 
 [dependencies]
+challenge_10 = { path = "../challenge_10" }
+challenge_11 = { path = "../challenge_11" }
+challenge_12 = { path = "../challenge_12" }
+lazy_static = "1.2.0"
