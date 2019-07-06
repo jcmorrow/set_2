@@ -39,12 +39,14 @@ fn random_utf8_byte() -> u8 {
     rand::thread_rng().gen_range(0, 128)
 }
 
+#[allow(dead_code)]
 fn random_padding(min: usize, max: usize) -> Vec<u8> {
     (0..rand::thread_rng().gen_range(min, max))
         .map(|_| 0x04)
         .collect()
 }
 
+#[allow(dead_code)]
 fn pad_five_to_ten_randomly(input: &[u8]) -> Vec<u8> {
     let mut new: Vec<u8> = Vec::new();
     new.append(&mut random_padding(5, 10));

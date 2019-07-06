@@ -67,7 +67,7 @@ fn pad_with_x04(s: &[u8], len: u32) -> Vec<u8> {
     let mut padded = s.to_owned();
 
     while padded.len() < len as usize {
-        padded.push('\x04' as u8);
+        padded.push(0x04);
     }
     padded
 }
@@ -243,7 +243,6 @@ mod test {
 
         buf_reader.read_to_string(&mut encrypted_base_64).unwrap();
         let encrypted = base_64_to_hex(&encrypted_base_64);
-        let bytes = hex_to_bytes(&encrypted);
         let key = "YELLOW SUBMARINE";
 
         assert_eq!(

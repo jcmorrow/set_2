@@ -1,14 +1,16 @@
 use challenge_10::*;
-use challenge_11::*;
 use challenge_12::*;
 use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 
 fn main() -> Result<(), std::io::Error> {
-    // Who needs to know the key ahead of time?
-    let unknown_key = random_aes_key();
+    decrypt_text_from_oracle(&oracle);
+    Ok(())
+}
 
+fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
+    // Who needs to know the key ahead of time?
     let mut block_size = 4;
     let mut last_output: Vec<u8> = Vec::new();
 
@@ -19,7 +21,7 @@ fn main() -> Result<(), std::io::Error> {
         for _ in 0..block_size {
             padding.push(0x04);
         }
-        let oracle_output = oracle(&padding, &unknown_key);
+        let oracle_output = oracle(&padding);
 
         let common_bytes = oracle_output
             .chunks(2)
@@ -42,7 +44,7 @@ fn main() -> Result<(), std::io::Error> {
     // Now that we know the key size, it should be easy to see if we are dealing with ECB, because
     // a repeated block in the input will result in a repeated block in the output
     let contrived_double_block: Vec<u8> = (0..block_size * 2).map(|_| 0x04).collect();
-    let oracle_output = oracle(&contrived_double_block, &unknown_key);
+    let oracle_output = oracle(&contrived_double_block);
     if oracle_output[0..block_size] == oracle_output[block_size..block_size * 2] {
         println!("Confirmed ECB. Continuing to padding attack.");
     } else {
@@ -62,17 +64,17 @@ fn main() -> Result<(), std::io::Error> {
             let mut combined = padding.clone();
             combined.append(&mut deciphered.clone());
             combined.push(i);
-            let relevant_output = &oracle(&combined, &unknown_key)[0..combined.len()].to_vec();
+            let relevant_output = &oracle(&combined)[0..combined.len()].to_vec();
             output_to_char
                 .entry(bytes_to_hex_string(relevant_output))
                 .or_insert(i);
         }
-        let oracle_output = oracle(&padding, &unknown_key);
+        let oracle_output = oracle(&padding);
         let next = match output_to_char.get(&bytes_to_hex_string(
             &oracle_output[0..=padding.len() + deciphered.len()],
         )) {
             Some(c) => c,
-            None => return Ok(()),
+            None => return deciphered,
         };
         if padding.is_empty() {
             /*

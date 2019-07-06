@@ -2,7 +2,6 @@ use std::fs;
 
 extern crate challenge_10;
 extern crate challenge_11;
-use challenge_10::*;
 use challenge_11::*;
 
 fn main() {

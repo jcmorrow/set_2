@@ -58,17 +58,24 @@ those ciphertexts, and now you can. If our experience is any guideline, this
 attack will get you code execution in security tests about once a year.
 */
 
+#[macro_use]
+extern crate lazy_static;
 extern crate challenge_10;
 extern crate challenge_11;
 
 use challenge_10::*;
+use challenge_11::*;
 use std::fs;
 
-pub fn oracle(input: &[u8], key: &[u8]) -> Vec<u8> {
+lazy_static! {
+    static ref SECRET_KEY: Vec<u8> = random_aes_key();
+}
+
+pub fn oracle(input: &[u8]) -> Vec<u8> {
     let mut unknown_bytes = hex_to_bytes(&base_64_to_hex(
         &fs::read_to_string("unknown_string.txt").expect("Unable to read file"),
     ));
     let mut to_encrypt = input.to_vec();
     to_encrypt.append(&mut unknown_bytes);
-    encrypt_aes_128_ecb(&to_encrypt, &bytes_to_string(&key))
+    encrypt_aes_128_ecb(&to_encrypt, &bytes_to_string(&SECRET_KEY))
 }
