@@ -26,10 +26,7 @@ fn profile_for(email: &str) -> String {
     let mut profile: HashMap<String, String> = HashMap::new();
     profile.insert(String::from("uid"), String::from("10"));
     profile.insert(String::from("role"), String::from("user"));
-    profile.insert(
-        String::from("emailemailemailemailemailemailemailemailemailemailemailemail"),
-        stripped_email,
-    );
+    profile.insert(String::from("email"), stripped_email);
     generate_cookie(profile)
 }
 
