@@ -1,8 +1,9 @@
 [workspace]
 
 members = [
-    "challenge_1",
-    "challenge_2",
-    "challenge_3",
+    "challenge_09",
+    "challenge_10",
+    "challenge_11",
     "challenge_12",
+    "challenge_13",
 ]

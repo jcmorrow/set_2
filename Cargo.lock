@@ -28,28 +28,32 @@ dependencies = [
 ]
 
 [[package]]
-name = "challenge_12"
-version = "0.1.0"
-dependencies = [
- "challenge_2 0.1.0",
- "challenge_3 0.1.0",
-]
-
-[[package]]
-name = "challenge_2"
+name = "challenge_10"
 version = "0.1.0"
 dependencies = [
  "openssl 0.10.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
-name = "challenge_3"
+name = "challenge_11"
 version = "0.1.0"
 dependencies = [
- "challenge_2 0.1.0",
+ "challenge_10 0.1.0",
  "openssl 0.10.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "challenge_12"
+version = "0.1.0"
+dependencies = [
+ "challenge_10 0.1.0",
+ "challenge_11 0.1.0",
+]
+
+[[package]]
+name = "challenge_13"
+version = "0.1.0"
 
 [[package]]
 name = "cloudabi"

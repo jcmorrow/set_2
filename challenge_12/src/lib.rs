@@ -58,10 +58,10 @@ those ciphertexts, and now you can. If our experience is any guideline, this
 attack will get you code execution in security tests about once a year.
 */
 
-extern crate challenge_2;
-extern crate challenge_3;
+extern crate challenge_10;
+extern crate challenge_11;
 
-use challenge_2::*;
+use challenge_10::*;
 use std::fs;
 
 pub fn oracle(input: &[u8], key: &[u8]) -> Vec<u8> {

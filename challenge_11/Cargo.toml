@@ -1,7 +1,9 @@
 [package]
-name = "challenge_2"
+name = "challenge_11"
 version = "0.1.0"
 authors = ["Josh Morrow <josh@jcmorrow.com>"]
 
 [dependencies]
 openssl = "0.10"
+challenge_10 = { path = "../challenge_10" }
+rand = "0.6.5"

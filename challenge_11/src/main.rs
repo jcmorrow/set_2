@@ -1,9 +1,9 @@
 use std::fs;
 
-extern crate challenge_2;
-extern crate challenge_3;
-use challenge_2::*;
-use challenge_3::*;
+extern crate challenge_10;
+extern crate challenge_11;
+use challenge_10::*;
+use challenge_11::*;
 
 fn main() {
     let plaintext = fs::read_to_string("plaintext.txt").expect("Unable to read file");

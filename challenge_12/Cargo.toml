@@ -5,5 +5,5 @@ authors = ["Josh Morrow <josh@jcmorrow.com>"]
 edition = "2018"
 
 [dependencies]
-challenge_2 = { path = "../challenge_2" }
-challenge_3 = { path = "../challenge_3" }
+challenge_10 = { path = "../challenge_10" }
+challenge_11 = { path = "../challenge_11" }

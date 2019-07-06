@@ -1,5 +1,6 @@
-extern crate challenge_2;
-use challenge_2::*;
+extern crate challenge_10;
+use challenge_10::*;
+
 use std::fs::File;
 use std::io::{BufReader, Read};
 
@@ -40,13 +41,4 @@ fn main() {
     println!("maybe tailing junk: \t{:?}", encrypted_2);
 
     println!("{:?}", &tailing_junk);
-
-    // println!(
-    //     "Decrypted (mine): {:?}",
-    //     decrypt_aes_128_ecb(&encrypted, key.as_bytes())
-    // );
-    // println!(
-    //     "Decrypted (bernies): {:?}",
-    //     decrypt_data(&encrypted, key.as_bytes())
-    // );
 }

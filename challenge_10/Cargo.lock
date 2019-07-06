@@ -21,7 +21,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "challenge_2"
+name = "challenge_10"
 version = "0.1.0"
 dependencies = [
  "openssl 0.10.23 (registry+https://github.com/rust-lang/crates.io-index)",

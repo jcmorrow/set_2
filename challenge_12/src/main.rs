@@ -1,21 +1,23 @@
+use challenge_10::*;
+use challenge_11::*;
 use challenge_12::*;
-use challenge_2::*;
-use challenge_3::*;
 use std::collections::HashMap;
-use std::fs;
+use std::io;
+use std::io::prelude::*;
 
-fn main() {
-    // If we already knew the key size we could use this, but let's pretend we dont'
-    let plaintext = "SIXTEEN BYTES YO";
+fn main() -> Result<(), std::io::Error> {
     // Who needs to know the key ahead of time?
     let unknown_key = random_aes_key();
 
     let mut block_size = 4;
     let mut last_output: Vec<u8> = Vec::new();
+
+    // Find the key size. The first block of bytes will stop changing once we
+    // exceed it, and it's almost certainly a multiple of 2.
     loop {
         let mut padding: Vec<u8> = Vec::new();
         for _ in 0..block_size {
-            padding.push('A' as u8);
+            padding.push(0x04);
         }
         let oracle_output = oracle(&padding, &unknown_key);
 
@@ -42,7 +44,9 @@ fn main() {
     let contrived_double_block: Vec<u8> = (0..block_size * 2).map(|_| 0x04).collect();
     let oracle_output = oracle(&contrived_double_block, &unknown_key);
     if oracle_output[0..block_size] == oracle_output[block_size..block_size * 2] {
-        println!("Confirmed ECB");
+        println!("Confirmed ECB. Continuing to padding attack.");
+    } else {
+        panic!("It looks like we aren't in ECB mode, a padding attack won't work.");
     }
 
     // Now for the actual decryption. We'll use a fixed padding that is 1 byte short of the key
@@ -64,17 +68,33 @@ fn main() {
                 .or_insert(i);
         }
         let oracle_output = oracle(&padding, &unknown_key);
-        let next = output_to_char
-            [&bytes_to_hex_string(&oracle_output[0..=padding.len() + deciphered.len()])];
-        if next == 0 {
-            break;
-        }
+        let next = match output_to_char.get(&bytes_to_hex_string(
+            &oracle_output[0..=padding.len() + deciphered.len()],
+        )) {
+            Some(c) => c,
+            None => return Ok(()),
+        };
         if padding.is_empty() {
+            /*
+             * When we reach the end of the block we need to start using the
+             * next available block for the attack. For instance, decoding the
+             * alphabet encrypted under a 4-byte cypher might look like this:
+             * XXX?????
+             * XXA?????
+             * XAB?????
+             * ABC?????
+             * XXXABCD?
+             * Now instead of varying the character in the final block spot of
+             * our first block, we vary the character in the final block spot
+             * of our second block. This goes on until you've decrypted the
+             * whole message.
+             */
             padding = (0..block_size - 1).map(|_| 0).collect();
         } else {
             padding.pop();
         }
-        deciphered.push(next);
-        println!("{:?}", bytes_to_string(&deciphered));
+        deciphered.push(*next);
+        print!("{}", *next as char);
+        io::stdout().flush().unwrap();
     }
 }

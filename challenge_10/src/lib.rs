@@ -2,8 +2,7 @@ extern crate openssl;
 
 use openssl::symm::{decrypt, encrypt, Cipher, Crypter, Mode};
 
-use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::Read;
 
 const BASE_64_ALPHABET: [char; 64] = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
@@ -110,7 +109,8 @@ pub fn byte_to_hex(b: u8) -> String {
 }
 
 pub fn bytes_to_string(s: &[u8]) -> String {
-    String::from_utf8(s.to_owned()).expect(&format!("Can't turn {:?} into valid string", s))
+    String::from_utf8(s.to_owned())
+        .unwrap_or_else(|_| panic!("Can't turn {:?} into valid string", s))
 }
 
 pub fn base_64_to_hex(s: &str) -> String {
@@ -137,7 +137,7 @@ pub fn base_64_index(c: char) -> isize {
             return i as isize;
         }
     }
-    return -1;
+    -1
 }
 
 pub fn decrypt_aes_128_ecb(encrypted: &[u8], key: &[u8]) -> Vec<u8> {
@@ -219,7 +219,6 @@ mod test {
 
         buf_reader.read_to_string(&mut encrypted_base_64).unwrap();
         let encrypted = base_64_to_hex(&encrypted_base_64);
-        let bytes = hex_to_bytes(&encrypted);
         let key = "YELLOW SUBMARINE";
 
         assert_eq!(
@@ -270,7 +269,7 @@ mod test {
 
         let key = "YELLOW SUBMARINE";
 
-        let encrypted = encrypt_aes_128_cbc(&decrypted, key);
+        let encrypted = encrypt_aes_128_cbc(decrypted.as_bytes(), key);
 
         assert_eq!(
             bytes_to_hex_string(&cbc_encrypted),

@@ -24,10 +24,10 @@ code that, pointed at a block box that might be encrypting ECB or CBC, tells you
 happening.
 */
 
-extern crate challenge_2;
+extern crate challenge_10;
 extern crate rand;
 
-use challenge_2::*;
+use challenge_10::*;
 use rand::Rng;
 use std::collections::HashMap;
 
