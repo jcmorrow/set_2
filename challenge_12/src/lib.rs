@@ -79,12 +79,31 @@ pub fn oracle(input: &[u8]) -> Vec<u8> {
     let mut unknown_bytes = hex_to_bytes(&base_64_to_hex(
         &fs::read_to_string("unknown_string.txt").expect("Unable to read file"),
     ));
-    let mut to_encrypt = input.to_vec();
+    let mut to_encrypt = vec![0; 17];
+    to_encrypt.append(&mut input.to_vec());
     to_encrypt.append(&mut unknown_bytes);
     encrypt_aes_128_ecb(&to_encrypt, &bytes_to_string(&SECRET_KEY))
 }
 
+pub fn shared_bytes(a: &[u8], b: &[u8], skip: usize) -> usize {
+    a.chunks(2)
+        .zip(b.chunks(2))
+        .skip(skip)
+        .take_while(|(a, b)| a == b)
+        .count()
+        * 2
+}
+
 pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
+    /*
+    First we need to know how many bytes of this content will remain the same
+    even when we start interjecting stuff?
+    */
+    let no_padding = oracle(&[]);
+    let one_padding = oracle(&[0x61]);
+
+    let before_padding = shared_bytes(&no_padding, &one_padding, 0);
+
     let mut padding_size = 1;
     let mut last_output: Vec<u8> = Vec::new();
 
@@ -95,26 +114,22 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
     until the block _after that_ stops changing.
     */
     let mut block_size = 0;
-    let mut block_offset = 0;
-    let mut before_padding = 0;
+    let mut bytes_to_end_of_block = 0;
     while block_size == 0 {
         let padding: Vec<u8> = (0..padding_size).map(|_| 0x61).collect();
         let oracle_output = oracle(&padding);
-        println!("{:?}", padding);
 
-        let common_bytes_by_two = oracle_output
-            .chunks(2)
-            .zip(last_output.chunks(2))
-            .skip(before_padding)
-            .take_while(|(a, b)| a == b)
-            .count();
-
-        if common_bytes_by_two > 0 {
-            if block_offset == 0 {
-                before_padding = common_bytes_by_two;
-                block_offset = padding_size;
+        let common_bytes = shared_bytes(&last_output, &oracle_output, before_padding);
+        if common_bytes > 0 {
+            // The block we are inserting into has stopped changing.
+            if bytes_to_end_of_block == 0 {
+                bytes_to_end_of_block = padding_size - before_padding - 1;
+            } else {
+                block_size = common_bytes;
+                if bytes_to_end_of_block == block_size {
+                    bytes_to_end_of_block = 0;
+                }
             }
-            block_size = common_bytes_by_two * 2;
         } else if padding_size > 256 {
             panic!("Can't find a stable block size");
         } else {
@@ -122,12 +137,14 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
             padding_size += 1;
         }
     }
-    println!("Found key size: {}", block_size);
+    println!("Found block size: {}", block_size);
+    println!("Block offset size: {}", bytes_to_end_of_block);
 
-    // Now that we know the key size, it should be easy to see if we are dealing with ECB, because
-    // a repeated block in the input will result in a repeated block in the output
-    // Because we might not know exactly where the block begins and ends we should use a 3x block
-    // padding in order to ensure a perfectly repeated block
+    // Now that we know the block size, it should be easy to see if we are
+    // dealing with ECB, because a repeated block in the input will result in a
+    // repeated block in the output Because we might not know exactly where the
+    // block begins and ends we should use a 3x block padding in order to ensure
+    // a perfectly repeated block.
     let contrived_triple_block: Vec<u8> = (0..block_size * 3).map(|_| 0x61).collect();
     let oracle_output = oracle(&contrived_triple_block);
     let mut seen: HashSet<Vec<u8>> = HashSet::new();
@@ -145,12 +162,26 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
         panic!("It looks like we aren't in ECB mode, a padding attack won't work.");
     }
 
-    // Now for the actual decryption. We'll use a fixed padding that is 1 byte short of the key
-    // size, and we'll map over all of UTF-8 to get the outcomes of the oracle for each codepoint
-    // in that last position. Once we have that, we can iterate over the bytes in the cyphered
-    // text, and use the map we've built up to figure out their de-encrypted form.
+    // Now for the actual decryption. We'll use a fixed padding that is 1 byte
+    // short of the key size, and we'll map over all of UTF-8 to get the
+    // outcomes of the oracle for each codepoint in that last position. Once we
+    // have that, we can iterate over the bytes in the cyphered text, and use
+    // the map we've built up to figure out their de-encrypted form.
     let mut deciphered: Vec<u8> = Vec::new();
-    let mut padding: Vec<u8> = (0..block_size - 1).map(|_| 0).collect();
+    // We add a block size here to that even if we are already at the end of a
+    // block we put in the right amount of padding
+    let mut padding: Vec<u8> = match bytes_to_end_of_block {
+        1 => (0..0),
+        _ => (0..bytes_to_end_of_block + block_size - 1),
+    }
+    .map(|_| 0x61)
+    .collect();
+    dbg!(&before_padding);
+    dbg!(&bytes_to_end_of_block);
+    let mut beginning_of_block = before_padding + bytes_to_end_of_block;
+
+    dbg!(&padding.len());
+    dbg!(&beginning_of_block);
 
     loop {
         let mut output_to_char: HashMap<String, u8> = HashMap::new();
@@ -158,33 +189,34 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
             let mut combined = padding.clone();
             combined.append(&mut deciphered.clone());
             combined.push(i);
-            let relevant_output = &oracle(&combined)[0..combined.len()].to_vec();
+            let relevant_output = &oracle(&combined)
+                [beginning_of_block..beginning_of_block + block_size - 1]
+                .to_vec();
             output_to_char
                 .entry(bytes_to_hex_string(relevant_output))
                 .or_insert(i);
         }
         let oracle_output = oracle(&padding);
         let next = match output_to_char.get(&bytes_to_hex_string(
-            &oracle_output[0..=padding.len() + deciphered.len()],
+            &oracle_output[beginning_of_block..beginning_of_block + block_size - 1],
         )) {
             Some(c) => c,
             None => return deciphered,
         };
-        if padding.is_empty() {
-            /*
-             * When we reach the end of the block we need to start using the
-             * next available block for the attack. For instance, decoding the
-             * alphabet encrypted under a 4-byte cypher might look like this:
-             * XXX?????
-             * XXA?????
-             * XAB?????
-             * ABC?????
-             * XXXABCD?
-             * Now instead of varying the character in the final block spot of
-             * our first block, we vary the character in the final block spot
-             * of our second block. This goes on until we've decrypted the
-             * whole message.
-             */
+        if padding.len() == 0 {
+            //   When we reach the end of the block we need to start using the
+            //   next available block for the attack. For instance, decoding the
+            //   alphabet encrypted under a 4-byte cypher might look like this:
+            //   XXX?|????
+            //   XXA?|????
+            //   XAB?|????
+            //   ABC?|????
+            //   XXXA|BCD?
+            //   Now instead of varying the character in the final block spot of
+            //   our first block, we vary the character in the final block spot
+            //   of our second block. This goes on until we've decrypted the
+            //   whole message.
+            beginning_of_block += block_size;
             padding = (0..block_size - 1).map(|_| 0x61).collect();
         } else {
             padding.pop();
