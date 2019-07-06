@@ -107,30 +107,38 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
     let mut padding_size = 1;
     let mut last_output: Vec<u8> = Vec::new();
 
-    /*
-    When we have passed end of the block that we are inserting into it will
-    stop changing. This is our initial offset between where our padding is
-    going and the end of the block. However, we don't know the block size
-    until the block _after that_ stops changing.
-    */
+    // When we have passed end of the block that we are inserting into it will
+    // stop changing. This is our initial offset between where our padding is
+    // going and the end of the block. However, we don't know the block size
+    // until the block _after that_ stops changing.
     let mut block_size = 0;
     let mut bytes_to_end_of_block = 0;
     while block_size == 0 {
         let padding: Vec<u8> = (0..padding_size).map(|_| 0x61).collect();
         let oracle_output = oracle(&padding);
 
+        // Number of bytes shared between out latest output and the output
+        // before that, ignoring the stuff that we know never changes
         let common_bytes = shared_bytes(&last_output, &oracle_output, before_padding);
+
         if common_bytes > 0 {
             // The block we are inserting into has stopped changing.
             if bytes_to_end_of_block == 0 {
                 bytes_to_end_of_block = padding_size - before_padding - 1;
             } else {
                 block_size = common_bytes;
+                // Here's a thing that can happen - we were inserting to the
+                // beginning of the string, and we found out that we were X
+                // bytes from the end of the block, but we didn't know how big
+                // the block was yet. It turns out the block is X bytes big, so
+                // actually we were at the end of the block when we started. In
+                // other words, we are zero bytes from the end of the block we
+                // are inserting into.
                 if bytes_to_end_of_block == block_size {
                     bytes_to_end_of_block = 0;
                 }
             }
-        } else if padding_size > 256 {
+        } else if padding_size > 512 {
             panic!("Can't find a stable block size");
         } else {
             last_output = oracle_output.to_vec();
@@ -145,6 +153,12 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
     // repeated block in the output Because we might not know exactly where the
     // block begins and ends we should use a 3x block padding in order to ensure
     // a perfectly repeated block.
+    //==========================================================================
+    // OK, actually, I've rewritten portions of this function so we *always*
+    // know at this point how big the blocks are and exactly how much
+    // information we would have to pad in order to pick up ECB, but all that
+    // that would save us is a block_size amount of memory a single time, and
+    // that's not worth it. I'm leaving this as it is.
     let contrived_triple_block: Vec<u8> = (0..block_size * 3).map(|_| 0x61).collect();
     let oracle_output = oracle(&contrived_triple_block);
     let mut seen: HashSet<Vec<u8>> = HashSet::new();
@@ -163,25 +177,22 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
     }
 
     // Now for the actual decryption. We'll use a fixed padding that is 1 byte
-    // short of the key size, and we'll map over all of UTF-8 to get the
+    // short of the block size, and we'll map over all of UTF-8 to get the
     // outcomes of the oracle for each codepoint in that last position. Once we
     // have that, we can iterate over the bytes in the cyphered text, and use
     // the map we've built up to figure out their de-encrypted form.
     let mut deciphered: Vec<u8> = Vec::new();
-    // We add a block size here to that even if we are already at the end of a
-    // block we put in the right amount of padding
+    // We add a block size here so that even if we are already at the end of a
+    // block we put in the right amount of padding. There is a corner case which
+    // is if we *start* at 1 from the end of the block. In that case, we don't
+    // need *any* padding to start with.
     let mut padding: Vec<u8> = match bytes_to_end_of_block {
         1 => (0..0),
         _ => (0..bytes_to_end_of_block + block_size - 1),
     }
     .map(|_| 0x61)
     .collect();
-    dbg!(&before_padding);
-    dbg!(&bytes_to_end_of_block);
     let mut beginning_of_block = before_padding + bytes_to_end_of_block;
-
-    dbg!(&padding.len());
-    dbg!(&beginning_of_block);
 
     loop {
         let mut output_to_char: HashMap<String, u8> = HashMap::new();
@@ -203,7 +214,7 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
             Some(c) => c,
             None => return deciphered,
         };
-        if padding.len() == 0 {
+        if padding.is_empty() {
             //   When we reach the end of the block we need to start using the
             //   next available block for the attack. For instance, decoding the
             //   alphabet encrypted under a 4-byte cypher might look like this:
