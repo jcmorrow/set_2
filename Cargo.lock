@@ -28,6 +28,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "challenge_12"
+version = "0.1.0"
+dependencies = [
+ "challenge_2 0.1.0",
+ "challenge_3 0.1.0",
+]
+
+[[package]]
 name = "challenge_2"
 version = "0.1.0"
 dependencies = [
