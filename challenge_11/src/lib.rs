@@ -35,7 +35,7 @@ pub fn random_aes_key() -> Vec<u8> {
     (0..16).map(|_| random_utf8_byte()).collect()
 }
 
-fn random_utf8_byte() -> u8 {
+pub fn random_utf8_byte() -> u8 {
     rand::thread_rng().gen_range(0, 128)
 }
 

@@ -1,0 +1,13 @@
+[package]
+name = "challenge_14"
+version = "0.1.0"
+authors = ["Josh Morrow <josh@jcmorrow.com>"]
+edition = "2018"
+
+[dependencies]
+challenge_10 = { path = "../challenge_10" }
+challenge_11 = { path = "../challenge_11" }
+challenge_12 = { path = "../challenge_12" }
+challenge_13 = { path = "../challenge_13" }
+lazy_static = "1.2.0"
+rand = "0.6.5"

@@ -32,7 +32,7 @@ fn main() {
     // email=XXXXXXXXXX|16_BYTES_WE_WANT|&uid=10&role=user
     //       ^   10    ^
     // Let's give it a shot!
-    let plain = "YELLOW SUBMARINE".as_bytes();
+    let plain = b"YELLOW SUBMARINE";
     let mut email: Vec<u8> = (0..10).map(|_| 0x04).collect();
     email.append(&mut plain.to_vec());
 
@@ -48,9 +48,9 @@ fn main() {
     //       ^     13     ^
     // So, we need a thirteen character email:
     // allurbsrblng2 ought to work
-    let mut first_two_blocks = escaping_oracle("allurbsrblng2".as_bytes())[0..32].to_vec();
+    let mut first_two_blocks = escaping_oracle(b"allurbsrblng2")[0..32].to_vec();
     let mut email_padding_for_admin: Vec<u8> = (0..10).map(|_| 0x04).collect();
-    email_padding_for_admin.append(&mut "admin".as_bytes().to_vec());
+    email_padding_for_admin.append(&mut b"admin".to_vec());
     email_padding_for_admin.append(&mut [0; 11].to_vec());
     let mut last_block = escaping_oracle(&email_padding_for_admin)[16..32].to_vec();
     first_two_blocks.append(&mut last_block);

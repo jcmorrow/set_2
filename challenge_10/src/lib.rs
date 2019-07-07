@@ -1,6 +1,6 @@
 extern crate openssl;
 
-use openssl::symm::{decrypt, encrypt, Cipher, Crypter, Mode};
+use openssl::symm::{encrypt, Cipher, Crypter, Mode};
 
 use std::io::Read;
 
@@ -64,9 +64,10 @@ pub fn pad_with_null_bytes(xs: &[u8], len: usize) -> Vec<u8> {
 }
 
 fn pad_with_x04(s: &[u8], len: u32) -> Vec<u8> {
-    let mut padded = s.to_owned();
+    let mut padded = s.to_vec();
 
     while padded.len() < len as usize {
+        println!("PUSHING");
         padded.push(0x04);
     }
     padded
@@ -145,11 +146,7 @@ pub fn decrypt_aes_128_ecb(encrypted: &[u8], key: &str) -> Vec<u8> {
     let mut plain: Vec<u8> = Vec::new();
 
     let blocks: Vec<&[u8]> = encrypted.chunks(block_size).rev().collect();
-    for (i, block) in blocks.clone().iter().enumerate() {
-        let previous_cyphertext = match blocks.get(i + 1) {
-            Some(x) => x,
-            None => &[0 as u8; 16][..],
-        };
+    for block in blocks {
         let decrypted_block = decrypt_one_block_aes_128_ecb(&block, key.as_bytes());
         plain.splice(0..0, decrypted_block.iter().cloned());
     }
@@ -231,12 +228,13 @@ mod test {
         let encrypted = base_64_to_hex(&encrypted_base_64);
         let key = "YELLOW SUBMARINE";
 
+        let round_tripped = decrypt_aes_128_ecb(&hex_to_bytes(&encrypted), key);
         assert_eq!(
-            decrypted,
-            bytes_to_string(&decrypt_aes_128_ecb(
-                &hex_to_bytes(&encrypted),
-                key.as_bytes()
-            ))
+            bytes_to_string(&pad_with_x04(
+                &decrypted.as_bytes(),
+                round_tripped.len() as u32
+            )),
+            bytes_to_string(&round_tripped)
         );
     }
 
