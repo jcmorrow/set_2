@@ -140,10 +140,20 @@ pub fn base_64_index(c: char) -> isize {
     -1
 }
 
-pub fn decrypt_aes_128_ecb(encrypted: &[u8], key: &[u8]) -> Vec<u8> {
-    let cipher = Cipher::aes_128_ecb();
+pub fn decrypt_aes_128_ecb(encrypted: &[u8], key: &str) -> Vec<u8> {
+    let block_size = 16;
+    let mut plain: Vec<u8> = Vec::new();
 
-    decrypt(cipher, key, None, encrypted).unwrap()
+    let blocks: Vec<&[u8]> = encrypted.chunks(block_size).rev().collect();
+    for (i, block) in blocks.clone().iter().enumerate() {
+        let previous_cyphertext = match blocks.get(i + 1) {
+            Some(x) => x,
+            None => &[0 as u8; 16][..],
+        };
+        let decrypted_block = decrypt_one_block_aes_128_ecb(&block, key.as_bytes());
+        plain.splice(0..0, decrypted_block.iter().cloned());
+    }
+    plain
 }
 
 pub fn encrypt_one_block_aes_128_ecb(decrypted: &[u8], key: &str) -> Vec<u8> {

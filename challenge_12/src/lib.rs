@@ -95,12 +95,21 @@ pub fn shared_bytes(a: &[u8], b: &[u8], skip: usize) -> usize {
 }
 
 pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
+    // Are we sure we have an oracle function and a character that pads it correctly?
+    let mut padding_byte = 0;
+    while padding_byte != 0xFF {
+        if oracle(&[]) != oracle(&[padding_byte]) {
+            println!("Found working padding byte: {}", padding_byte);
+            break;
+        }
+        padding_byte += 1;
+    }
     /*
     First we need to know how many bytes of this content will remain the same
     even when we start interjecting stuff?
     */
     let no_padding = oracle(&[]);
-    let one_padding = oracle(&[0x61]);
+    let one_padding = oracle(&[padding_byte]);
 
     let before_padding = shared_bytes(&no_padding, &one_padding, 0);
 
@@ -114,7 +123,7 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
     let mut block_size = 0;
     let mut bytes_to_end_of_block = 0;
     while block_size == 0 {
-        let padding: Vec<u8> = (0..padding_size).map(|_| 0x61).collect();
+        let padding: Vec<u8> = (0..padding_size).map(|_| padding_byte).collect();
         let oracle_output = oracle(&padding);
 
         // Number of bytes shared between out latest output and the output
@@ -159,7 +168,7 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
     // information we would have to pad in order to pick up ECB, but all that
     // that would save us is a block_size amount of memory a single time, and
     // that's not worth it. I'm leaving this as it is.
-    let contrived_triple_block: Vec<u8> = (0..block_size * 3).map(|_| 0x61).collect();
+    let contrived_triple_block: Vec<u8> = (0..block_size * 3).map(|_| padding_byte).collect();
     let oracle_output = oracle(&contrived_triple_block);
     let mut seen: HashSet<Vec<u8>> = HashSet::new();
     let mut ecb = false;
@@ -190,7 +199,7 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
         1 => (0..0),
         _ => (0..bytes_to_end_of_block + block_size - 1),
     }
-    .map(|_| 0x61)
+    .map(|_| padding_byte)
     .collect();
     let mut beginning_of_block = before_padding + bytes_to_end_of_block;
 
@@ -228,7 +237,7 @@ pub fn decrypt_text_from_oracle(oracle: &Fn(&[u8]) -> Vec<u8>) -> Vec<u8> {
             //   of our second block. This goes on until we've decrypted the
             //   whole message.
             beginning_of_block += block_size;
-            padding = (0..block_size - 1).map(|_| 0x61).collect();
+            padding = (0..block_size - 1).map(|_| padding_byte).collect();
         } else {
             padding.pop();
         }
