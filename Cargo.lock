@@ -77,6 +77,13 @@ dependencies = [
 [[package]]
 name = "challenge_15"
 version = "0.1.0"
+dependencies = [
+ "challenge_10 0.1.0",
+]
+
+[[package]]
+name = "challenge_16"
+version = "0.1.0"
 
 [[package]]
 name = "cloudabi"
