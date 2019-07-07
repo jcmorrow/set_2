@@ -36,7 +36,7 @@ fn main() {
     let mut email: Vec<u8> = (0..10).map(|_| 0x04).collect();
     email.append(&mut plain.to_vec());
 
-    let encrypted = swallowing_oracle(&email)[16..32].to_vec();
+    let encrypted = escaping_oracle(&email)[16..32].to_vec();
 
     println!(
         "{}",
@@ -48,11 +48,11 @@ fn main() {
     //       ^     13     ^
     // So, we need a thirteen character email:
     // allurbsrblng2 ought to work
-    let mut first_two_blocks = swallowing_oracle("allurbsrblng2".as_bytes())[0..32].to_vec();
+    let mut first_two_blocks = escaping_oracle("allurbsrblng2".as_bytes())[0..32].to_vec();
     let mut email_padding_for_admin: Vec<u8> = (0..10).map(|_| 0x04).collect();
     email_padding_for_admin.append(&mut "admin".as_bytes().to_vec());
     email_padding_for_admin.append(&mut [0; 11].to_vec());
-    let mut last_block = swallowing_oracle(&email_padding_for_admin)[16..32].to_vec();
+    let mut last_block = escaping_oracle(&email_padding_for_admin)[16..32].to_vec();
     first_two_blocks.append(&mut last_block);
     println!("{:?}", &reverse_oracle(&first_two_blocks));
 }
