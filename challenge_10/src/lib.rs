@@ -67,7 +67,6 @@ fn pad_with_x04(s: &[u8], len: u32) -> Vec<u8> {
     let mut padded = s.to_vec();
 
     while padded.len() < len as usize {
-        println!("PUSHING");
         padded.push(0x04);
     }
     padded
